@@ -6,6 +6,8 @@
 
 ![界面截图](docs/screenshot.jpg)
 
+> 想看每个模块为什么这么写 → [代码导读](docs/CODE_GUIDE.md)
+
 ---
 
 ## 它解决什么问题
