@@ -116,5 +116,36 @@ class TestSession(unittest.TestCase):
         self.assertEqual(s.get(sid), [])
 
 
+class TestRegionRerank(unittest.TestCase):
+    """地区重排序：问了某省偏向该省，没问偏向国家级。"""
+
+    def setUp(self):
+        from core import rag
+        self.rag = rag
+        self.hits = [
+            (0.030, 0.80, {"region": "河南", "doc": "河南A", "doc_no": "豫1"}),
+            (0.029, 0.79, {"region": "全国", "doc": "国家B", "doc_no": "国1"}),
+            (0.028, 0.78, {"region": "河南", "doc": "河南C", "doc_no": "豫2"}),
+        ]
+        self.regions = {"河南", "全国"}
+
+    def test_national_question_prefers_national(self):
+        out = self.rag.region_rerank(self.hits, "一次性求职补贴谁能领", self.regions)
+        self.assertEqual(out[0][2]["region"], "全国")
+
+    def test_region_question_prefers_that_region(self):
+        out = self.rag.region_rerank(self.hits, "河南求职补贴谁能领", self.regions)
+        self.assertEqual(out[0][2]["region"], "河南")
+
+    def test_no_hits_removed(self):
+        """只调分数，不删候选——万一只有地方政策能答，过滤掉就查不到了"""
+        out = self.rag.region_rerank(self.hits, "河南补贴", self.regions)
+        self.assertEqual(len(out), len(self.hits))
+
+    def test_scores_preserved(self):
+        out = self.rag.region_rerank(self.hits, "河南补贴", self.regions)
+        self.assertTrue(all(isinstance(x[1], float) for x in out))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

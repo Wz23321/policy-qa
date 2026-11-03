@@ -290,7 +290,7 @@ python scripts/eval.py all
 ## 测试
 
 ```bash
-python -m unittest discover -s tests -v    # Python：12 条
+python -m unittest discover -s tests -v    # Python：16 条
 cd cpp-client && make test                 # C++：25 条
 ```
 

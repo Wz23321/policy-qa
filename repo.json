@@ -1,0 +1,1 @@
+{"name": "policy-qa", "description": "大学生就业创业政策问答服务：RAG 检索 + Agent 工具调用，提供 HTTP 接口、Python SDK 与 C++ 客户端", "private": false, "has_issues": true, "has_wiki": false}
