@@ -8,3 +8,4 @@ cpp-client/test_json
 /*.html
 hn_*.json
 .claude/
+repo.json
