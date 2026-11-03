@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大学生就业创业政策问答</title>
+<style>
+  :root {
+    --bg: #0f1216; --panel: #161b22; --line: #262d36;
+    --text: #e6edf3; --muted: #8b949e; --accent: #4c9aff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.7 "Microsoft YaHei", system-ui, sans-serif;
+    display: flex; justify-content: center; min-height: 100vh;
+  }
+  main { width: min(880px, 100%); padding: 40px 24px 140px; }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+  .bar { display: flex; gap: 10px; }
+  input {
+    flex: 1; background: var(--panel); border: 1px solid var(--line);
+    color: var(--text); padding: 13px 16px; border-radius: 10px;
+    font-size: 15px; font-family: inherit; outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button {
+    background: var(--accent); color: #06101f; border: 0; font-weight: 600;
+    padding: 0 22px; border-radius: 10px; cursor: pointer; font-size: 15px;
+    font-family: inherit;
+  }
+  button:disabled { opacity: .5; cursor: default; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font-size: 13px; color: var(--muted); border: 1px solid var(--line);
+    padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+  .chip.on { color: #06101f; background: var(--accent); border-color: var(--accent); }
+
+  .msg { margin-top: 20px; }
+  .msg .label { font-size: 12px; color: var(--muted); letter-spacing: .06em; margin-bottom: 8px; }
+  .msg.user .bubble {
+    background: #1c2530; border: 1px solid var(--line);
+    border-radius: 12px; padding: 11px 16px;
+  }
+  .msg.assistant .bubble {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 18px 20px;
+  }
+  .answer { white-space: pre-wrap; }
+  .steps { margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .steps div { padding: 2px 0; }
+  .steps code { color: var(--accent); }
+  .src { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .src div { font-size: 13px; color: var(--muted); padding: 3px 0; }
+  .src b { color: var(--text); font-weight: 500; }
+  .flag { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .err { color: #ff7b72; }
+  .thinking { color: var(--muted); font-size: 14px; }
+
+  .footer { position: fixed; bottom: 0; left: 0; right: 0;
+            padding: 14px 24px; background: linear-gradient(transparent, var(--bg) 30%); }
+  .footer .inner { width: min(880px, 100%); margin: 0 auto; display: flex; gap: 10px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>大学生就业创业政策问答</h1>
+  <div class="sub">数据来源：中国政府网公开政策文件 · 回答附原文出处 · 支持追问</div>
+
+  <div class="chips" id="modes"></div>
+  <div class="chips" id="chips"></div>
+  <div id="conversation"></div>
+  <div id="out"></div>
+</main>
+
+<div class="footer">
+  <div class="inner">
+    <input id="q" placeholder="问点什么，比如：创业贷款能贷多少？" autocomplete="off">
+    <button id="go">发送</button>
+  </div>
+</div>
+
+<script>
+const samples = [
+  "一次性求职补贴谁能领？",
+  "创业担保贷款最高多少？",
+  "就业见习补贴是给谁的？",
+  "灵活就业社保补贴标准",
+  "到基层就业有什么政策支持？"
+];
+
+let mode = 'agent';
+let sessionId = null;
+
+// ---- 模式切换 ----
+const modesEl = document.getElementById('modes');
+[['agent', 'Agent 模式'], ['rag', '直接检索']].forEach(([key, label]) => {
+  const el = document.createElement('span');
+  el.className = 'chip';
+  el.textContent = label;
+  el.dataset.mode = key;
+  el.onclick = () => setMode(key);
+  modesEl.appendChild(el);
+});
+
+function setMode(key) {
+  mode = key;
+  [...modesEl.children].forEach(c => c.classList.toggle('on', c.dataset.mode === key));
+}
+
+// ---- 示例问题 ----
+const chipsEl = document.getElementById('chips');
+samples.forEach(s => {
+  const el = document.createElement('span');
+  el.className = 'chip';
+  el.textContent = s;
+  el.onclick = () => { document.getElementById('q').value = s; ask(); };
+  chipsEl.appendChild(el);
+});
+
+const out = document.getElementById('out');
+const conv = document.getElementById('conversation');
+const btn = document.getElementById('go');
+const input = document.getElementById('q');
+
+input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+btn.onclick = ask;
+
+// ---- 建会话 ----
+async function ensureSession() {
+  if (sessionId) return sessionId;
+  try {
+    const r = await fetch('/session/new', { method: 'POST' });
+    sessionId = (await r.json()).session_id;
+  } catch (e) { /* 没会话也能问，只是不记上下文 */ }
+  return sessionId;
+}
+
+function addUser(text) {
+  const el = document.createElement('div');
+  el.className = 'msg user';
+  el.innerHTML = `<div class="label">你</div><div class="bubble">${escapeHtml(text)}</div>`;
+  conv.appendChild(el);
+}
+
+function addAssistant(d) {
+  const srcHtml = (d.sources && d.sources.length)
+    ? '<div class="src"><div class="label">引用来源</div>' +
+      d.sources.map((s, i) =>
+        `<div>[${i + 1}] <b>${s.doc_no || '无文号'}</b> · ${s.doc}　<span style="opacity:.6">相关度 ${(s.score * 100).toFixed(0)}%</span></div>`
+      ).join('') + '</div>'
+    : '';
+
+  const stepsHtml = (d.steps && d.steps.length)
+    ? '<div class="steps"><div class="label">调用记录</div>' +
+      d.steps.map((s, i) =>
+        `<div>${i + 1}. <code>${s.tool}</code> ${escapeHtml(JSON.stringify(s.args)).slice(0, 70)}</div>`
+      ).join('') + '</div>'
+    : '';
+
+  const flag = d.cached ? '<div class="flag">（命中缓存，未消耗 token）</div>' : '';
+
+  const el = document.createElement('div');
+  el.className = 'msg assistant';
+  el.innerHTML = `<div class="label">回答</div>
+    <div class="bubble">
+      <div class="answer">${render(d.answer)}</div>
+      ${stepsHtml}${srcHtml}${flag}
+    </div>`;
+  conv.appendChild(el);
+}
+
+async function ask() {
+  const question = input.value.trim();
+  if (!question) return;
+
+  btn.disabled = true;
+  input.value = '';
+  addUser(question);
+
+  out.innerHTML = `<div class="msg"><div class="thinking">${
+    mode === 'agent' ? 'Agent 思考中，可能会调几次工具…' : '检索中…'}</div></div>`;
+
+  try {
+    const sid = await ensureSession();
+    const payload = { question };
+    if (sid) payload.session_id = sid;
+
+    const res = await fetch(mode === 'agent' ? '/agent' : '/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+
+    const d = await res.json();
+    out.innerHTML = '';
+    addAssistant(d);
+    window.scrollTo(0, document.body.scrollHeight);
+  } catch (e) {
+    out.innerHTML = `<div class="msg err">出错了：${e.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    input.focus();
+  }
+}
+
+function render(s) {
+  return escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+}
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+setMode('agent');
+ensureSession();
+input.focus();
+</script>
+</body>
+</html>

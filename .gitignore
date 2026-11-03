@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+data/index.pkl
+cpp-client/*.o
+cpp-client/policy-cli
+cpp-client/test_json
+/*.html
+hn_*.json
+.claude/
