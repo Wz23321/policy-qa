@@ -99,6 +99,27 @@ def diversify(hits, per_doc=2):
     return out
 
 
+def region_rerank(hits, question, regions):
+    """按地区重排：问了某个省就偏向该省，没问就偏向国家级。
+
+    不做直接过滤——万一地方政策才是唯一相关的，过滤掉就什么都查不到了。
+    只调分数，让相关性接近时地区优先。
+    """
+    target = next((r for r in regions if r != "全国" and r in question), None)
+
+    out = []
+    for fused, vsim, c in hits:
+        reg = c.get("region", "全国")
+        if target:
+            factor = 1.30 if reg == target else (1.10 if reg == "全国" else 1.0)
+        else:
+            factor = 1.15 if reg == "全国" else 1.0
+        out.append((fused * factor, vsim, c))
+
+    out.sort(key=lambda x: -x[0])
+    return out
+
+
 def ask(question, index, k=config.TOP_K, history=None, mode="vector"):
     """问一个问题，返回 {answer, sources, used, search_query, cached}"""
     # 单轮问答可以按问题缓存；多轮依赖上文，不能缓存
@@ -116,6 +137,8 @@ def ask(question, index, k=config.TOP_K, history=None, mode="vector"):
     # 关键词模式的分数不是余弦相似度，量纲不同，不套用向量阈值
     floor = 0.05 if mode == "keyword" else config.MIN_VEC_SIM
     hits = [h for h in hits if h[1] >= floor]
+    regions = {c.get("region", "全国") for _, _, c in hits}
+    hits = region_rerank(hits, search_query, regions)
     hits = diversify(hits)[:k]
 
     if not hits:

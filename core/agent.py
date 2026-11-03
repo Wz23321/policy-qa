@@ -116,12 +116,16 @@ def read_policy(index, doc_no):
 
 def run_tool(name, args, index):
     if name == "search_policy":
-        hits = retriever.search(index, args.get("query", ""), top=config.TOP_K)
+        query = args.get("query", "")
+        hits = retriever.search(index, query, top=config.TOP_K * 3)
+        regions = {c.get("region", "全国") for _, _, c in hits}
+        hits = rag.region_rerank(hits, query, regions)[:config.TOP_K]
         if not hits:
             return "没有检索到相关内容。"
         out = []
         for i, (_, vsim, c) in enumerate(hits, 1):
-            out.append(f"[{i}] 《{c['doc']}》{c['doc_no']}（相关度 {vsim:.2f}）\n{c['text']}")
+            tag = "" if c.get("region", "全国") == "全国" else f"（{c['region']}）"
+            out.append(f"[{i}] 《{c['doc']}》{tag}{c['doc_no']}（相关度 {vsim:.2f}）\n{c['text']}")
         return "\n\n".join(out)
 
     if name == "read_policy":
