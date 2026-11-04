@@ -1,5 +1,10 @@
-"""读 .env 里的配置。"""
+"""读配置：优先环境变量，其次 .env 文件。
 
+环境变量优先是为了容器部署——docker-compose 通过 environment 传 key，
+容器里没有 .env 文件。
+"""
+
+import os
 import pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -9,25 +14,30 @@ INDEX = DATA / "index.pkl"
 
 
 def load_env():
-    """把 .env 里的 KEY=VALUE 读进字典"""
+    """合并环境变量和 .env 文件。环境变量优先级更高。"""
     env = {}
+
     path = ROOT / ".env"
-    if not path.exists():
-        return env
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        env[k.strip()] = v.strip()
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            env[k.strip()] = v.strip()
+
+    for key in ("DEEPSEEK_API_KEY", "DEEPSEEK_BASE", "MODEL", "HF_ENDPOINT"):
+        if os.environ.get(key):
+            env[key] = os.environ[key]
+
     return env
 
 
 ENV = load_env()
 
 DEEPSEEK_KEY = ENV.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE = "https://api.deepseek.com/v1"
-MODEL = "deepseek-chat"
+DEEPSEEK_BASE = ENV.get("DEEPSEEK_BASE", "https://api.deepseek.com/v1")
+MODEL = ENV.get("MODEL", "deepseek-chat")
 EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
 
 CHUNK_SIZE = 400      # 每块字数

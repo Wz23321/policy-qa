@@ -138,7 +138,37 @@ Windows 上也可以直接双击 `start.bat`。
 | `read_policy` | 读某份政策全文（按文号或文件名） |
 | `calculate` | 安全四则运算（只允许数字和运算符，不执行任何代码） |
 
-### 接口总览
+### Docker 部署
+
+```bash
+# 1. 设置 key（不要写进镜像）
+export DEEPSEEK_API_KEY=sk-你的key
+
+# 2. 构建并启动
+docker compose up -d
+
+# 3. 看状态
+curl http://127.0.0.1:8100/health
+```
+
+镜像构建阶段会下载向量模型并预建索引，所以容器启动即可用，不用等。
+
+`core/config.py` 优先读环境变量、其次读 `.env`，所以容器里通过 `environment` 传 key 也能识别。
+
+---
+
+## 快速体验
+
+```bash
+python scripts/demo.py          # Agent 模式，跑 5 个典型问题
+python scripts/demo.py --fast   # 直接检索模式，更快
+```
+
+演示覆盖五种情况：国家层面政策、地方政策、跨文件对比、多步推理、超纲拒答。
+
+---
+
+## 接口总览
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
