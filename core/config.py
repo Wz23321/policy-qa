@@ -42,7 +42,7 @@ EMBED_MODEL = "BAAI/bge-small-zh-v1.5"
 
 CHUNK_SIZE = 400      # 每块字数
 CHUNK_OVERLAP = 60    # 相邻块重叠
-TOP_K = 6             # 检索返回几块（语料扩大后从 5 调到 6，召回回到 100%）
+TOP_K = 6             # 实测 top_k=4 不会更快（差异在噪声内），保持 6 保召回
 MIN_VEC_SIM = 0.40    # 向量相似度低于这个值，判定"没有相关内容"
 MAX_TURNS = 6         # 多轮对话保留最近几轮
 COMPRESS_AFTER = 8    # 超过这么多轮就压缩旧内容

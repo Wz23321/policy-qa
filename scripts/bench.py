@@ -111,6 +111,24 @@ def main(n):
     print(f"  加速比           {times[0] / max(statistics.mean(times[1:]), 0.01):.0f}x")
     print(f"  缓存统计         {cache.QUERY_CACHE.stats()}")
 
+    # 首字延迟：流式场景下用户真正感知的指标
+    print("\n首字延迟（流式）")
+    ttft = []
+    for q in questions[:5]:
+        cache.QUERY_CACHE.clear()
+        start = time.perf_counter()
+        first = None
+        for ev in rag.ask_stream(q, index):
+            if ev["type"] == "delta" and first is None:
+                first = time.perf_counter() - start
+            elif ev["type"] == "done":
+                break
+        if first:
+            ttft.append(first * 1000)
+    if ttft:
+        print(f"  中位 {statistics.median(ttft):.0f} ms   "
+              f"最快 {min(ttft):.0f} ms   最慢 {max(ttft):.0f} ms")
+
     # 成本估算
     print("\n成本估算（按 deepseek-chat 约 ¥2/百万 token 输入价粗算）")
     avg = statistics.median(tokens)
