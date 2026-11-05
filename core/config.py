@@ -45,3 +45,16 @@ CHUNK_OVERLAP = 60    # 相邻块重叠
 TOP_K = 6             # 检索返回几块（语料扩大后从 5 调到 6，召回回到 100%）
 MIN_VEC_SIM = 0.40    # 向量相似度低于这个值，判定"没有相关内容"
 MAX_TURNS = 6         # 多轮对话保留最近几轮
+COMPRESS_AFTER = 8    # 超过这么多轮就压缩旧内容
+
+LLM_TIMEOUT = 60      # 单次模型调用超时（秒）
+RETRY_ATTEMPTS = 3    # 失败重试次数
+RETRY_BASE_DELAY = 1.0
+RETRY_MAX_DELAY = 8.0
+
+SESSION_FILE = DATA / "sessions.json"
+
+# 查询时给 embedding 加一句领域前缀。
+# 短问题（"灵活就业社保补贴标准"）缺少学科语境，加前缀能显著提升召回；
+# 不加的话正确答案可能排到 20 名开外。
+QUERY_HINT = "高校毕业生就业政策 "

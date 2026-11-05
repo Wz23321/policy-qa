@@ -5,17 +5,19 @@
 """
 
 import contextlib
+import json
 import sys
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
 from fastapi import FastAPI, HTTPException  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.responses import FileResponse, StreamingResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 
-from core import agent, cache, chunker, config, rag, retriever, session  # noqa: E402
+from core import (agent, cache, chunker, compress, config, rag,  # noqa: E402
+                  retriever, session)
 
 STATIC = pathlib.Path(__file__).resolve().parent / "static"
 
@@ -81,12 +83,13 @@ def health():
 def ask(body: AskIn):
     # 传了 session_id 就取出上文，实现多轮
     sid = body.session_id
-    history = session.STORE.get(sid) if sid else None
+    history = compress.build_history(session.STORE, sid) if sid else None
 
     result = rag.ask(body.question, get_index(), k=body.top_k, history=history)
 
     if sid:
         session.STORE.append(sid, body.question, result["answer"])
+        compress.maybe_compress(session.STORE, sid)
 
     return AskOut(
         answer=result["answer"],
@@ -105,16 +108,49 @@ class AgentOut(BaseModel):
     session_id: str | None = None
 
 
+@app.post("/ask/stream")
+def ask_stream(body: AskIn):
+    """流式问答：SSE 逐段返回，前端可以边生成边显示。"""
+    sid = body.session_id
+    history = compress.build_history(session.STORE, sid) if sid else None
+
+    def sse(obj):
+        return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+
+    def gen():
+        parts = []
+        try:
+            for ev in rag.ask_stream(body.question, get_index(),
+                                     k=body.top_k, history=history):
+                if ev["type"] == "delta":
+                    parts.append(ev["text"])
+                yield sse(ev)
+
+            if sid:
+                session.STORE.append(sid, body.question, "".join(parts))
+                compress.maybe_compress(session.STORE, sid)
+                yield sse({"type": "session", "session_id": sid})
+        except Exception as exc:
+            yield sse({"type": "error", "message": str(exc)})
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.post("/agent", response_model=AgentOut)
 def agent_ask(body: AskIn):
     """Agent 模式：模型自己决定调哪些工具。"""
     sid = body.session_id
-    history = session.STORE.get(sid) if sid else None
+    history = compress.build_history(session.STORE, sid) if sid else None
 
     result = agent.ask(body.question, get_index(), history=history)
 
     if sid:
         session.STORE.append(sid, body.question, result["answer"])
+        compress.maybe_compress(session.STORE, sid)
 
     return AgentOut(
         answer=result["answer"],

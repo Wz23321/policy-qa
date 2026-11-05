@@ -8,7 +8,7 @@ import ast
 import json
 import operator
 
-from . import config, rag, retriever
+from . import config, llm, rag, retriever
 
 MAX_STEPS = 5
 
@@ -139,7 +139,6 @@ def run_tool(name, args, index):
 
 def ask(question, index, verbose=False, history=None):
     """跑一个完整的 Agent 循环，返回 {answer, steps, used}"""
-    client = rag.get_client()
     messages = [
         {"role": "system", "content": SYSTEM},
     ]
@@ -150,12 +149,7 @@ def ask(question, index, verbose=False, history=None):
     total_tokens = 0
 
     for _ in range(MAX_STEPS):
-        resp = client.chat.completions.create(
-            model=config.MODEL,
-            messages=messages,
-            tools=TOOLS,
-            temperature=0.2,
-        )
+        resp = llm.chat(messages, tools=TOOLS, temperature=0.2)
         total_tokens += resp.usage.total_tokens
         msg = resp.choices[0].message
 

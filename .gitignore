@@ -9,3 +9,5 @@ cpp-client/test_json
 hn_*.json
 .claude/
 repo.json
+data/sessions.json
+data/*.tmp

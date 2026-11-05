@@ -96,7 +96,9 @@ def _build_vectors(chunks):
 
 
 def _vector_search(index, query):
-    q = list(get_embedder().embed([query]))[0]
+    # 短问题缺上下文，加领域前缀能明显提升召回
+    text = (config.QUERY_HINT + query) if config.QUERY_HINT else query
+    q = list(get_embedder().embed([text]))[0]
     qn = float((sum(x * x for x in q)) ** 0.5) or 1.0
 
     out = []

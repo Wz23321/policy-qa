@@ -87,7 +87,7 @@ class TestLRUCache(unittest.TestCase):
 
 class TestSession(unittest.TestCase):
     def test_history_accumulates(self):
-        s = session.SessionStore()
+        s = session.SessionStore(path=None)
         sid = s.new_id()
         s.append(sid, "问题1", "回答1")
         s.append(sid, "问题2", "回答2")
@@ -96,20 +96,24 @@ class TestSession(unittest.TestCase):
         self.assertEqual(h[0]["role"], "user")
         self.assertEqual(h[1]["role"], "assistant")
 
-    def test_history_truncated(self):
-        s = session.SessionStore()
+    def test_history_bounded(self):
+        """历史不能无限增长——超过硬上限会截断（正常情况下由压缩处理）"""
+        s = session.SessionStore(path=None)
         sid = s.new_id()
-        for i in range(20):
+        for i in range(40):
             s.append(sid, f"问题{i}", f"回答{i}")
         h = s.get(sid)
-        self.assertLessEqual(len(h), session.config.MAX_TURNS * 2)
+        hard_limit = session.config.COMPRESS_AFTER * 2 + 8
+        self.assertLessEqual(len(h), hard_limit)
+        # 保留的应该是最近的
+        self.assertEqual(h[-1]["content"], "回答39")
 
     def test_unknown_session_returns_empty(self):
-        s = session.SessionStore()
+        s = session.SessionStore(path=None)
         self.assertEqual(s.get("不存在的id"), [])
 
     def test_clear(self):
-        s = session.SessionStore()
+        s = session.SessionStore(path=None)
         sid = s.new_id()
         s.append(sid, "q", "a")
         s.clear(sid)

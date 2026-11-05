@@ -6,100 +6,155 @@
 <title>大学生就业创业政策问答</title>
 <style>
   :root {
-    --bg: #0f1216; --panel: #161b22; --line: #262d36;
+    --bg: #0d1117; --panel: #161b22; --line: #262d36; --line-soft: #1e242c;
     --text: #e6edf3; --muted: #8b949e; --accent: #4c9aff;
+    --accent-dim: #1f3a5f; --warn: #d29922; --err: #ff7b72;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.7 "Microsoft YaHei", system-ui, sans-serif;
+    font: 15px/1.75 "Microsoft YaHei", system-ui, -apple-system, sans-serif;
     display: flex; justify-content: center; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
-  main { width: min(880px, 100%); padding: 40px 24px 140px; }
-  h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
-  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+  main { width: min(880px, 100%); padding: 40px 24px 160px; }
 
-  .bar { display: flex; gap: 10px; }
-  input {
-    flex: 1; background: var(--panel); border: 1px solid var(--line);
-    color: var(--text); padding: 13px 16px; border-radius: 10px;
-    font-size: 15px; font-family: inherit; outline: none;
-  }
-  input:focus { border-color: var(--accent); }
-  button {
-    background: var(--accent); color: #06101f; border: 0; font-weight: 600;
-    padding: 0 22px; border-radius: 10px; cursor: pointer; font-size: 15px;
-    font-family: inherit;
-  }
-  button:disabled { opacity: .5; cursor: default; }
+  header { margin-bottom: 26px; }
+  h1 { font-size: 21px; font-weight: 600; margin: 0 0 8px; letter-spacing: .2px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .sub b { color: var(--accent); font-weight: 500; }
 
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .chip {
-    font-size: 13px; color: var(--muted); border: 1px solid var(--line);
-    padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    font-size: 13px; color: var(--muted); background: var(--panel);
+    border: 1px solid var(--line); padding: 6px 14px; border-radius: 999px;
+    cursor: pointer; transition: all .15s; user-select: none;
   }
   .chip:hover { color: var(--text); border-color: var(--accent); }
   .chip.on { color: #06101f; background: var(--accent); border-color: var(--accent); }
 
-  .msg { margin-top: 20px; }
-  .msg .label { font-size: 12px; color: var(--muted); letter-spacing: .06em; margin-bottom: 8px; }
-  .msg.user .bubble {
-    background: #1c2530; border: 1px solid var(--line);
-    border-radius: 12px; padding: 11px 16px;
-  }
-  .msg.assistant .bubble {
-    background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 18px 20px;
-  }
-  .answer { white-space: pre-wrap; }
-  .steps { margin-top: 14px; font-size: 13px; color: var(--muted); }
-  .steps div { padding: 2px 0; }
-  .steps code { color: var(--accent); }
-  .src { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
-  .src div { font-size: 13px; color: var(--muted); padding: 3px 0; }
-  .src b { color: var(--text); font-weight: 500; }
-  .flag { font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .err { color: #ff7b72; }
-  .thinking { color: var(--muted); font-size: 14px; }
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+  .samples .chip { font-size: 12.5px; border-style: dashed; }
 
-  .footer { position: fixed; bottom: 0; left: 0; right: 0;
-            padding: 14px 24px; background: linear-gradient(transparent, var(--bg) 30%); }
-  .footer .inner { width: min(880px, 100%); margin: 0 auto; display: flex; gap: 10px; }
+  .msg { margin-bottom: 22px; animation: rise .22s ease; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+  .msg .who {
+    font-size: 12px; color: var(--muted); letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .bubble { border-radius: 12px; padding: 18px 20px; }
+  .msg.user .bubble {
+    background: #1b2530; border: 1px solid var(--line); padding: 12px 16px;
+  }
+  .msg.assistant .bubble { background: var(--panel); border: 1px solid var(--line); }
+
+  .answer { white-space: pre-wrap; word-break: break-word; }
+  .answer b { color: #fff; font-weight: 600; }
+  .caret {
+    display: inline-block; width: 7px; height: 16px; margin-left: 2px;
+    background: var(--accent); vertical-align: -2px;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .sources { margin-top: 18px; border-top: 1px solid var(--line-soft); padding-top: 14px; }
+  .sources .head {
+    font-size: 12px; color: var(--muted); letter-spacing: .08em; margin-bottom: 8px;
+  }
+  .src {
+    font-size: 13px; color: var(--muted); padding: 5px 0;
+    display: flex; gap: 8px; align-items: baseline;
+  }
+  .src .idx { color: var(--accent); flex: none; }
+  .src .no { color: var(--text); }
+  .badge {
+    display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px;
+    background: var(--accent-dim); color: #9ecbff; margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .badge.warn { background: #3d2f0d; color: var(--warn); }
+
+  .meta { font-size: 12px; color: #5c6672; margin-top: 10px; }
+  .err { color: var(--err); }
+  .err .tip { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+  .copy {
+    margin-top: 12px; font-size: 12px; color: var(--muted);
+    background: none; border: 1px solid var(--line); padding: 4px 10px;
+    border-radius: 6px; cursor: pointer;
+  }
+  .copy:hover { color: var(--text); border-color: var(--accent); }
+
+  .composer {
+    position: fixed; left: 0; right: 0; bottom: 0; padding: 16px 24px 20px;
+    background: linear-gradient(transparent, var(--bg) 35%);
+  }
+  .composer .inner { width: min(880px, 100%); margin: 0 auto; display: flex; gap: 10px; }
+  input {
+    flex: 1; background: var(--panel); border: 1px solid var(--line);
+    color: var(--text); padding: 13px 16px; border-radius: 10px;
+    font-size: 15px; font-family: inherit; outline: none; transition: border-color .15s;
+  }
+  input:focus { border-color: var(--accent); }
+  button.send {
+    background: var(--accent); color: #06101f; border: 0; font-weight: 600;
+    padding: 0 24px; border-radius: 10px; cursor: pointer; font-size: 15px;
+    font-family: inherit; transition: opacity .15s;
+  }
+  button.send:disabled { opacity: .45; cursor: default; }
+
+  @media (max-width: 640px) {
+    main { padding: 24px 16px 150px; }
+    h1 { font-size: 18px; }
+    .sources .src { flex-wrap: wrap; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>大学生就业创业政策问答</h1>
-  <div class="sub">数据来源：中国政府网公开政策文件 · 回答附原文出处 · 支持追问</div>
+  <header>
+    <h1>大学生就业创业政策问答</h1>
+    <div class="sub">数据来源：中国政府网 + 河南省人社厅公开政策文件 · 回答附原文出处</div>
+  </header>
 
-  <div class="chips" id="modes"></div>
-  <div class="chips" id="chips"></div>
+  <div class="toolbar" id="modes"></div>
+  <div class="samples" id="samples"></div>
   <div id="conversation"></div>
-  <div id="out"></div>
 </main>
 
-<div class="footer">
+<div class="composer">
   <div class="inner">
-    <input id="q" placeholder="问点什么，比如：创业贷款能贷多少？" autocomplete="off">
-    <button id="go">发送</button>
+    <input id="q" placeholder="问点什么，比如：河南的就业见习补贴有多少？" autocomplete="off">
+    <button class="send" id="go">发送</button>
   </div>
 </div>
 
 <script>
-const samples = [
-  "一次性求职补贴谁能领？",
-  "创业担保贷款最高多少？",
-  "就业见习补贴是给谁的？",
-  "灵活就业社保补贴标准",
-  "到基层就业有什么政策支持？"
+const MODES = [
+  ['stream', '流式问答'],
+  ['agent', 'Agent 模式'],
+  ['rag', '直接检索'],
+];
+const SAMPLES = [
+  '一次性求职补贴谁能领？',
+  '河南灵活就业社保补贴标准',
+  '创业担保贷款最高多少？',
+  '就业见习补贴是给谁的？',
+  '北京落户政策怎么样？',
 ];
 
-let mode = 'agent';
+let mode = 'stream';
 let sessionId = null;
+let busy = false;
 
-// ---- 模式切换 ----
-const modesEl = document.getElementById('modes');
-[['agent', 'Agent 模式'], ['rag', '直接检索']].forEach(([key, label]) => {
+const $ = (id) => document.getElementById(id);
+const conv = $('conversation');
+const input = $('q');
+const go = $('go');
+
+/* ---------- 模式切换 ---------- */
+const modesEl = $('modes');
+MODES.forEach(([key, label]) => {
   const el = document.createElement('span');
   el.className = 'chip';
   el.textContent = label;
@@ -107,118 +162,191 @@ const modesEl = document.getElementById('modes');
   el.onclick = () => setMode(key);
   modesEl.appendChild(el);
 });
-
 function setMode(key) {
   mode = key;
   [...modesEl.children].forEach(c => c.classList.toggle('on', c.dataset.mode === key));
 }
 
-// ---- 示例问题 ----
-const chipsEl = document.getElementById('chips');
-samples.forEach(s => {
+/* ---------- 示例问题 ---------- */
+const samplesEl = $('samples');
+SAMPLES.forEach(s => {
   const el = document.createElement('span');
   el.className = 'chip';
   el.textContent = s;
-  el.onclick = () => { document.getElementById('q').value = s; ask(); };
-  chipsEl.appendChild(el);
+  el.onclick = () => { input.value = s; ask(); };
+  samplesEl.appendChild(el);
 });
 
-const out = document.getElementById('out');
-const conv = document.getElementById('conversation');
-const btn = document.getElementById('go');
-const input = document.getElementById('q');
-
-input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
-btn.onclick = ask;
-
-// ---- 建会话 ----
+/* ---------- 会话 ---------- */
 async function ensureSession() {
   if (sessionId) return sessionId;
   try {
     const r = await fetch('/session/new', { method: 'POST' });
     sessionId = (await r.json()).session_id;
-  } catch (e) { /* 没会话也能问，只是不记上下文 */ }
+  } catch (e) { /* 没会话也能问 */ }
   return sessionId;
 }
 
+/* ---------- 渲染 ---------- */
 function addUser(text) {
   const el = document.createElement('div');
   el.className = 'msg user';
-  el.innerHTML = `<div class="label">你</div><div class="bubble">${escapeHtml(text)}</div>`;
+  el.innerHTML = `<div class="who">你</div><div class="bubble">${escapeHtml(text)}</div>`;
   conv.appendChild(el);
 }
 
-function addAssistant(d) {
-  const srcHtml = (d.sources && d.sources.length)
-    ? '<div class="src"><div class="label">引用来源</div>' +
-      d.sources.map((s, i) =>
-        `<div>[${i + 1}] <b>${s.doc_no || '无文号'}</b> · ${s.doc}　<span style="opacity:.6">相关度 ${(s.score * 100).toFixed(0)}%</span></div>`
-      ).join('') + '</div>'
-    : '';
-
-  const stepsHtml = (d.steps && d.steps.length)
-    ? '<div class="steps"><div class="label">调用记录</div>' +
-      d.steps.map((s, i) =>
-        `<div>${i + 1}. <code>${s.tool}</code> ${escapeHtml(JSON.stringify(s.args)).slice(0, 70)}</div>`
-      ).join('') + '</div>'
-    : '';
-
-  const flag = d.cached ? '<div class="flag">（命中缓存，未消耗 token）</div>' : '';
-
+function newAssistant() {
   const el = document.createElement('div');
   el.className = 'msg assistant';
-  el.innerHTML = `<div class="label">回答</div>
+  el.innerHTML = `<div class="who">回答</div>
     <div class="bubble">
-      <div class="answer">${render(d.answer)}</div>
-      ${stepsHtml}${srcHtml}${flag}
+      <div class="answer"><span class="caret"></span></div>
+      <div class="sources" hidden></div>
+      <div class="meta"></div>
     </div>`;
   conv.appendChild(el);
+  return {
+    el,
+    answer: el.querySelector('.answer'),
+    sources: el.querySelector('.sources'),
+    meta: el.querySelector('.meta'),
+  };
 }
+
+function renderSources(box, list) {
+  if (!list || !list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = '<div class="head">引用来源</div>' + list.map((s, i) => {
+    const region = (s.region && s.region !== '全国')
+      ? `<span class="badge">${escapeHtml(s.region)}</span>` : '';
+    const dead = s.invalid_date && s.invalid_date !== '未标注'
+      ? `<span class="badge warn">${escapeHtml(s.invalid_date)} 失效</span>` : '';
+    return `<div class="src">
+      <span class="idx">[${i + 1}]</span>
+      <span>${region}${dead}<span class="no">${escapeHtml(s.doc_no || '无文号')}</span>
+      · ${escapeHtml(s.doc)}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- 提问 ---------- */
+input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) ask(); });
+go.onclick = ask;
 
 async function ask() {
   const question = input.value.trim();
-  if (!question) return;
+  if (!question || busy) return;
 
-  btn.disabled = true;
+  busy = true;
+  go.disabled = true;
   input.value = '';
   addUser(question);
 
-  out.innerHTML = `<div class="msg"><div class="thinking">${
-    mode === 'agent' ? 'Agent 思考中，可能会调几次工具…' : '检索中…'}</div></div>`;
+  const ui = newAssistant();
+  scrollToEnd();
 
   try {
     const sid = await ensureSession();
-    const payload = { question };
-    if (sid) payload.session_id = sid;
-
-    const res = await fetch(mode === 'agent' ? '/agent' : '/ask', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-
-    const d = await res.json();
-    out.innerHTML = '';
-    addAssistant(d);
-    window.scrollTo(0, document.body.scrollHeight);
+    if (mode === 'stream') {
+      await askStream(question, sid, ui);
+    } else {
+      await askJson(question, sid, ui);
+    }
   } catch (e) {
-    out.innerHTML = `<div class="msg err">出错了：${e.message}</div>`;
+    ui.answer.innerHTML = `<span class="err">请求失败：${escapeHtml(e.message)}</span>
+      <div class="tip">检查服务是否在运行，或者稍后重试。</div>`;
   } finally {
-    btn.disabled = false;
+    busy = false;
+    go.disabled = false;
     input.focus();
+    scrollToEnd();
   }
 }
 
-function render(s) {
+/* 流式：边收边渲染 */
+async function askStream(question, sid, ui) {
+  const res = await fetch('/ask/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, session_id: sid }),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let text = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+
+    let cut;
+    while ((cut = buf.indexOf('\n\n')) >= 0) {
+      const raw = buf.slice(0, cut).trim();
+      buf = buf.slice(cut + 2);
+      if (!raw.startsWith('data:')) continue;
+
+      let ev;
+      try { ev = JSON.parse(raw.slice(5).trim()); } catch { continue; }
+
+      if (ev.type === 'delta') {
+        text += ev.text;
+        ui.answer.innerHTML = renderMd(text) + '<span class="caret"></span>';
+        scrollToEnd();
+      } else if (ev.type === 'done') {
+        ui.answer.innerHTML = renderMd(text);
+        renderSources(ui.sources, ev.sources);
+        ui.meta.textContent = ev.cached ? '命中缓存，未消耗 token' : '';
+        if (!ev.sources.length && !ev.cached) {
+          ui.meta.textContent = '材料中没有相关内容，未引用来源';
+        }
+      } else if (ev.type === 'session') {
+        sessionId = ev.session_id;
+      } else if (ev.type === 'error') {
+        throw new Error(ev.message);
+      }
+    }
+  }
+}
+
+/* 非流式：一次性返回 */
+async function askJson(question, sid, ui) {
+  const path = mode === 'agent' ? '/agent' : '/ask';
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, session_id: sid }),
+  });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const d = await res.json();
+
+  ui.answer.innerHTML = renderMd(d.answer || '');
+  renderSources(ui.sources, d.sources);
+
+  const bits = [];
+  if (d.steps && d.steps.length) {
+    bits.push('工具调用：' + d.steps.map(s => s.tool).join(' → '));
+  }
+  if (d.cached) bits.push('命中缓存');
+  if (d.used_tokens) bits.push(`消耗 ${d.used_tokens} token`);
+  ui.meta.textContent = bits.join('　');
+}
+
+/* ---------- 工具函数 ---------- */
+function renderMd(s) {
   return escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
 }
-
 function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return String(s).replace(/[&<>"']/g,
+    c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function scrollToEnd() {
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 }
 
-setMode('agent');
+setMode('stream');
 ensureSession();
 input.focus();
 </script>

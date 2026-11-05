@@ -1,10 +1,6 @@
 """RAG 主流程：检索 → 拼材料 → 让模型照着答。"""
 
-from openai import OpenAI
-
-from . import cache, config, retriever
-
-_client = None
+from . import cache, config, llm, retriever
 
 SYSTEM = """你是大学生就业创业政策助手。规则：
 
@@ -19,12 +15,8 @@ SYSTEM = """你是大学生就业创业政策助手。规则：
 
 
 def get_client():
-    global _client
-    if _client is None:
-        if not config.DEEPSEEK_KEY:
-            raise RuntimeError("没读到 DEEPSEEK_API_KEY，检查 .env")
-        _client = OpenAI(api_key=config.DEEPSEEK_KEY, base_url=config.DEEPSEEK_BASE)
-    return _client
+    """保留这个入口，内部走 llm 模块（带重试）。"""
+    return llm.get_client()
 
 
 REWRITE_PROMPT = """把用户最新的问题改写成一个不依赖上文、能独立检索的句子。
@@ -56,13 +48,13 @@ def rewrite_query(question, history):
         lines.append(f"{who}：{m['content'][:200]}")
 
     try:
-        resp = get_client().chat.completions.create(
-            model=config.MODEL,
-            messages=[{"role": "user",
-                       "content": REWRITE_PROMPT.format(
-                           history="\n".join(lines), question=question)}],
+        resp = llm.chat(
+            [{"role": "user",
+              "content": REWRITE_PROMPT.format(
+                  history="\n".join(lines), question=question)}],
             temperature=0,
             max_tokens=100,
+            attempts=2,          # 改写失败不重试太多次，直接用原问题
         )
         new_q = resp.choices[0].message.content.strip().strip('"“”')
         return new_q or question
@@ -120,6 +112,59 @@ def region_rerank(hits, question, regions):
     return out
 
 
+
+def _source(vsim, c):
+    """把检索块转成对外的来源结构。"""
+    return {
+        "doc": c["doc"],
+        "doc_no": c["doc_no"],
+        "org": c["org"],
+        "date": c["date"],
+        "region": c.get("region", "全国"),
+        "invalid_date": c.get("invalid_date", ""),
+        "score": float(round(float(vsim), 4)),   # numpy 的 float32 不能直接 json 序列化
+        "text": c["text"][:300],
+    }
+
+
+def _retrieve(question, index, k, history, mode):
+    """检索并整理来源。ask 和 ask_stream 共用。"""
+    search_query = rewrite_query(question, history)
+
+    hits = retriever.search(index, search_query, top=k * 3, mode=mode)
+    # 关键词模式的分数不是余弦相似度，量纲不同，不套用向量阈值
+    floor = 0.05 if mode == "keyword" else config.MIN_VEC_SIM
+    hits = [h for h in hits if h[1] >= floor]
+
+    regions = {c.get("region", "全国") for _, _, c in hits}
+    hits = region_rerank(hits, search_query, regions)
+    hits = diversify(hits)[:k]
+
+    sources = [_source(vsim, c) for _, vsim, c in hits]
+    return search_query, hits, sources
+
+
+REFUSAL_WORDS = ("没有找到", "未找到", "找不到", "无法回答", "不在政策库")
+
+
+def _is_refusal(text):
+    return any(k in text[:60] for k in REFUSAL_WORDS)
+
+
+def _build_messages(question, hits, history):
+    messages = [{"role": "system", "content": SYSTEM}]
+    if history:
+        messages.extend(history)
+    messages.append({
+        "role": "user",
+        "content": f"政策材料：\n{format_materials(hits)}\n\n问题：{question}",
+    })
+    return messages
+
+
+EMPTY_ANSWER = "提供的政策文件里没有找到相关内容。"
+
+
 def ask(question, index, k=config.TOP_K, history=None, mode="vector"):
     """问一个问题，返回 {answer, sources, used, search_query, cached}"""
     # 单轮问答可以按问题缓存；多轮依赖上文，不能缓存
@@ -130,65 +175,26 @@ def ask(question, index, k=config.TOP_K, history=None, mode="vector"):
             # 命中缓存没有新的 token 消耗
             return {**hit, "cached": True, "used": 0}
 
-    # 多轮对话时，先用上文把追问补全，否则检索抓不到重点
-    search_query = rewrite_query(question, history)
-
-    hits = retriever.search(index, search_query, top=k * 3, mode=mode)
-    # 关键词模式的分数不是余弦相似度，量纲不同，不套用向量阈值
-    floor = 0.05 if mode == "keyword" else config.MIN_VEC_SIM
-    hits = [h for h in hits if h[1] >= floor]
-    regions = {c.get("region", "全国") for _, _, c in hits}
-    hits = region_rerank(hits, search_query, regions)
-    hits = diversify(hits)[:k]
+    search_query, hits, sources = _retrieve(question, index, k, history, mode)
 
     if not hits:
-        result = {
-            "answer": "提供的政策文件里没有找到相关内容。",
-            "sources": [],
-            "used": 0,
-            "search_query": search_query,
-            "cached": False,
-        }
+        result = {"answer": EMPTY_ANSWER, "sources": [], "used": 0,
+                  "search_query": search_query, "cached": False}
         if not history:
             cache.QUERY_CACHE.put(cache_key, result)
         return result
 
-    messages = [{"role": "system", "content": SYSTEM}]
-    if history:
-        messages.extend(history)
-
-    messages.append({
-        "role": "user",
-        "content": f"政策材料：\n{format_materials(hits)}\n\n问题：{question}",
-    })
-
-    resp = get_client().chat.completions.create(
-        model=config.MODEL,
-        messages=messages,
-        temperature=0.2,
-    )
-
+    resp = llm.chat(_build_messages(question, hits, history), temperature=0.2)
     answer = resp.choices[0].message.content.strip()
 
     # 模型说没找到时，别再把来源列出来，否则界面上自相矛盾
-    if any(k in answer[:60] for k in ("没有找到", "未找到", "找不到", "无法回答", "不在政策库")):
+    if _is_refusal(answer):
         result = {"answer": answer, "sources": [],
                   "used": resp.usage.total_tokens,
                   "search_query": search_query, "cached": False}
         if not history:
             cache.QUERY_CACHE.put(cache_key, result)
         return result
-
-    sources = [{
-        "doc": c["doc"],
-        "doc_no": c["doc_no"],
-        "org": c["org"],
-        "date": c["date"],
-        "region": c.get("region", "全国"),
-        "invalid_date": c.get("invalid_date", ""),
-        "score": round(vsim, 4),
-        "text": c["text"][:300],
-    } for _, vsim, c in hits]
 
     result = {
         "answer": answer,
@@ -200,3 +206,54 @@ def ask(question, index, k=config.TOP_K, history=None, mode="vector"):
     if not history:
         cache.QUERY_CACHE.put(cache_key, result)
     return result
+
+
+def ask_stream(question, index, k=config.TOP_K, history=None, mode="vector"):
+    """流式版本。逐段 yield：
+
+    {"type": "meta",  "search_query": ...}
+    {"type": "delta", "text": "..."}       多次
+    {"type": "done",  "sources": [...], "used": n, "cached": bool}
+    """
+    cache_key = (mode, question.strip())
+    if not history:
+        hit = cache.QUERY_CACHE.get(cache_key)
+        if hit is not None:
+            yield {"type": "meta", "search_query": hit.get("search_query", "")}
+            yield {"type": "delta", "text": hit["answer"]}
+            yield {"type": "done", "sources": hit["sources"],
+                   "used": 0, "cached": True}
+            return
+
+    search_query, hits, sources = _retrieve(question, index, k, history, mode)
+    yield {"type": "meta", "search_query": search_query}
+
+    if not hits:
+        yield {"type": "delta", "text": EMPTY_ANSWER}
+        yield {"type": "done", "sources": [], "used": 0, "cached": False}
+        return
+
+    stream = llm.chat(_build_messages(question, hits, history),
+                      temperature=0.2, stream=True)
+
+    parts = []
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        piece = chunk.choices[0].delta.content
+        if piece:
+            parts.append(piece)
+            yield {"type": "delta", "text": piece}
+
+    answer = "".join(parts).strip()
+    refused = _is_refusal(answer)
+    final_sources = [] if refused else sources
+
+    if not history:
+        cache.QUERY_CACHE.put(cache_key, {
+            "answer": answer, "sources": final_sources,
+            "used": 0, "search_query": search_query, "cached": False,
+        })
+
+    yield {"type": "done", "sources": final_sources,
+           "used": 0, "cached": False}
