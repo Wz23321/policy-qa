@@ -12,6 +12,8 @@ import pickle
 import re
 from collections import Counter
 
+import numpy as np
+
 os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 from . import config  # noqa: E402
@@ -95,32 +97,39 @@ def _build_vectors(chunks):
     return [v.tolist() for v in vecs]
 
 
+def _build_vectors(chunks):
+    texts = [f"{c.get('region','')} {c['doc']}\n{c['text']}" for c in chunks]
+    vecs = list(get_embedder().embed(texts))
+    return np.asarray(vecs, dtype=np.float32)
+
+
 def _vector_search(index, query):
     # 短问题缺上下文，加领域前缀能明显提升召回
     text = (config.QUERY_HINT + query) if config.QUERY_HINT else query
-    q = list(get_embedder().embed([text]))[0]
-    qn = float((sum(x * x for x in q)) ** 0.5) or 1.0
+    q = np.asarray(list(get_embedder().embed([text]))[0], dtype=np.float32)
+    qn = float(np.linalg.norm(q)) or 1.0
 
-    out = []
-    for i, vec in enumerate(index["dvecs"]):
-        dot = sum(a * b for a, b in zip(q, vec))
-        vn = index["dnorms"][i] or 1.0
-        out.append((i, dot / (qn * vn)))
-    out.sort(key=lambda x: -x[1])
-    return out
+    # 整批算余弦相似度：矩阵乘一次搞定，比逐条 Python 循环快一个数量级
+    sims = index["dmat"] @ q / (index["dnorms"] * qn)
+
+    cap = min(len(sims), 50)
+    idx = np.argpartition(-sims, cap - 1)[:cap]
+    idx = idx[np.argsort(-sims[idx])]
+    return [(int(i), float(sims[i])) for i in idx]
 
 
 # ---------- 对外 ----------
 
 def build_index(chunks):
     kw = _build_keyword(chunks)
-    dvecs = _build_vectors(chunks)
-    dnorms = [math.sqrt(sum(x * x for x in v)) or 1.0 for v in dvecs]
+    dmat = _build_vectors(chunks)
+    dnorms = np.linalg.norm(dmat, axis=1)
+    dnorms[dnorms == 0] = 1.0
     return {
         "chunks": chunks,
         "idf": kw["idf"],
         "kvecs": kw["vectors"],
-        "dvecs": dvecs,
+        "dmat": dmat,           # numpy 二维数组，一次矩阵乘算完所有相似度
         "dnorms": dnorms,
     }
 
@@ -133,7 +142,14 @@ def save(index, path=config.INDEX):
 
 def load(path=config.INDEX):
     with open(path, "rb") as f:
-        return pickle.load(f)
+        index = pickle.load(f)
+
+    # 老格式存的是 dvecs（列表），新格式是 dmat（numpy 矩阵）
+    if "dmat" not in index:
+        raise RuntimeError(
+            "索引格式已更新，请重新运行：python scripts/build_index.py")
+
+    return index
 
 
 def rrf(rank_lists, k=60):

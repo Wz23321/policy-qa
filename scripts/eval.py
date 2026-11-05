@@ -79,21 +79,28 @@ REFUSE_WORDS = ("没有找到", "未找到", "找不到", "无法回答", "不�
                 "无法提供", "不在我的", "不在政策库", "没有相关", "无法查询")
 
 
+def _norm(text):
+    """去掉所有空白，避免「30 万元」和「30万」匹配不上。"""
+    return "".join(text.split())
+
+
 def judge(case, answer, sources, answer_text_has_doc=False):
+    flat = _norm(answer)
+
     if case.get("refuse"):
-        ok = any(k in answer for k in REFUSE_WORDS)
+        ok = any(k in flat for k in REFUSE_WORDS)
         return ok, "该拒答" if ok else "编造了答案"
 
-    hit = any(k in answer for k in case["expect_any"])
+    hit = any(_norm(k) in flat for k in case["expect_any"])
     if not hit:
         return False, "缺少关键信息"
 
     if case.get("doc"):
         # Agent 不返回结构化 sources，改为在答案正文里找文号
-        pool = " ".join(s.get("doc_no", "") for s in sources)
+        pool = _norm(" ".join(s.get("doc_no", "") for s in sources))
         if not pool and answer_text_has_doc:
-            pool = answer
-        if case["doc"] not in pool:
+            pool = flat
+        if _norm(case["doc"]) not in pool:
             return False, f"来源不对（未引到 {case['doc']}）"
 
     return True, "正确"
