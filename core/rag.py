@@ -138,7 +138,14 @@ def _retrieve(question, index, k, history, mode):
 
     regions = {c.get("region", "全国") for _, _, c in hits}
     hits = region_rerank(hits, search_query, regions)
-    hits = diversify(hits)[:k]
+
+    # 可选：用 cross-encoder 精排。默认关闭，原因见 core/rerank.py
+    if config.ENABLE_RERANK and hits:
+        from . import rerank as rerank_mod
+        hits = rerank_mod.rerank(search_query,
+                                 hits[:config.RERANK_CANDIDATES], top=k)
+    else:
+        hits = diversify(hits)[:k]
 
     sources = [_source(vsim, c) for _, vsim, c in hits]
     return search_query, hits, sources

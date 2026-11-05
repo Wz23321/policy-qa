@@ -58,3 +58,8 @@ SESSION_FILE = DATA / "sessions.json"
 # 短问题（"灵活就业社保补贴标准"）缺少学科语境，加前缀能显著提升召回；
 # 不加的话正确答案可能排到 20 名开外。
 QUERY_HINT = "高校毕业生就业政策 "
+
+# Rerank：精度更高但慢得多，默认关闭。开启理由和实测数据见 core/rerank.py
+ENABLE_RERANK = False
+RERANK_MODEL = "BAAI/bge-reranker-base"
+RERANK_CANDIDATES = 10      # 从多少个粗召回结果里重排
