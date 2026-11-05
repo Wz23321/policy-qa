@@ -11,3 +11,5 @@ hn_*.json
 repo.json
 data/sessions.json
 data/*.tmp
+.vs/
+*.vsidx
